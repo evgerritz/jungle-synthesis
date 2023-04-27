@@ -26,17 +26,10 @@ SynthDef(\kick,{|out= 0 freq = 440 amp = 0.1 ringTime=10.0 releaseTime=1.0 disto
 
 }).add();
 
-SynthDef(\snare, {arg out = 0, amp = 0.1, sinfreq = 180, att = 0.01, rel = 0.2, ffreq = 2000, pan = 0;
-	var env, snd1, snd2, sum;
-	env = Env.perc(att, rel, amp).kr(doneAction: 2);
-	snd1 = HPF.ar(
-		in: WhiteNoise.ar,
-		freq: ffreq,
-		mul: env
-	);
-	snd2 = SinOsc.ar(freq: sinfreq, mul: env);
-	sum = snd1 + snd2;
-	Out.ar(out, Pan2.ar(sum, pan));
+SynthDef(\snare, {
+	var pink_noise = PinkNoise.ar();
+	var env = EnvGen.ar(Env.perc(0.01, 0.3))*1;
+    Out.ar(0,Pan2.ar(pink_noise*env, 0, 1));
 }).add();
 
 SynthDef(\hihat, {arg out = 0, amp = 0.5, att = 0.01, rel = 0.2, ffreq = 6000, pan = 0;
@@ -53,6 +46,8 @@ SynthDef(\crash, { arg amp = 1;
   Out.ar(0, Pan2.ar(HPF.ar(whiteNoise, freq: 7040)) * 4 * amp);
 }).add;
 )
+
+
 
 
 (
@@ -86,11 +81,17 @@ m4 = Ppar([
 	~rhythm.(\kick, [Rest(1/2), 1/4, 1/4, Rest(3/2), 1/2, Rest(1)])
 ]);
 
-Pbind(\instrument, \snare, \dur, Prand([Pseq([1/256],256), Pseq([1/128], 128)], inf)).play;
+//ePbind(\instrument, \snare, \dur, Prand([Pseq([1/256],256), Pseq([1/128], 128)], 1)).play;
 FreqScope.new;
 
 Pseq([m1, m1, m3, m4], inf).play(t);
-Pseq([m1, m1, m3, m4], inf).play(t2);
+//Pseq([m1, m1, m3, m4], inf).play(t2);
 //Pseq([m1, m1, m3, m4], inf).play(t3);
 //Pseq([m1, m1, m3, m4], inf).play(t4);
 )
+
+SynthDef("snare", {
+	var pink_noise = PinkNoise.ar();
+	var env = EnvGen.ar(Env.perc(0.01, 0.3))*1;
+    Out.ar(0,Pan2.ar(pink_noise*env, 0, 1));
+}).play;

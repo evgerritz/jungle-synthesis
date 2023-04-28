@@ -48,7 +48,7 @@ def plot_amps(fund_freq, samplerate, samples, partials=range(1,31), smooth=True)
     fig, axs = plt.subplots(nrows, ncols, figsize=(ncols*8, nrows*8))
     for i in range(nrows):
         for j in range(ncols):
-            freq = fund_freq * partials[i*ncols + j]
+            freq = freqs[i*ncol+j]
             ax = axs[i,j]
             ax.set_ylabel('Power')
             ax.set_xlabel('Time [sec]')
@@ -84,54 +84,31 @@ def get_envs(freqs, samplerate, samples, smooth=True):
         print_array(amps)
     print('];')
 
-def timbrel_change(smooth = True, print_out = False):
-    # these values obtained by isolating a quiet/loud segment of a solo violin performance
-    # running audacity's spectral analysis to get amplitudes for various frequencies
-    # and taking the first 30 partials after finding the fundamental frequency
-    loud_partial_amps = np.array([-51.93972 , -49.4104  , -46.828625, -56.960018, -64.312508,
-       -62.737423, -29.59796 , -62.45232 , -64.916168, -64.447052,
-       -70.183189, -72.147018, -65.468178, -70.745598, -59.947681,
-       -59.926273, -69.282608, -74.263039, -59.553307, -63.807056,
-       -94.537758, -62.298313, -78.946373, -74.343536, -64.548203,
-       -82.339119, -84.327194, -70.587006, -74.463646, -83.49617 ])
-    quiet_partial_amps = np.array([ -65.825394,  -34.847195,  -52.882778,  -49.364624,  -54.84634 ,
-        -51.980816,  -59.094482,  -48.69043 ,  -66.581573,  -54.611156,
-        -74.646492,  -59.795284,  -81.939926,  -80.814651,  -77.027634,
-        -76.393929,  -89.03508 ,  -72.259262,  -72.2481  ,  -74.552094,
-       -106.836113,  -81.866112,  -94.832108,  -79.970268,  -83.187508,
-        -89.181671,  -98.206154,  -94.213165,  -98.791794, -100.895943])
-
-    if smooth:
-        loud_partial_amps = smooth_data(loud_partial_amps)
-        quiet_partial_amps = smooth_data(quiet_partial_amps)
-
-    # plot data
-    fig,axs = plt.subplots(3,1)
-    axs[0].plot(loud_partial_amps)
-    axs[0].set_title("Amplitude vs Partial No for Loud Violin")
-    axs[1].plot(quiet_partial_amps)
-    axs[1].set_title("Amplitude vs Partial No for Quiet Violin")
-    diff = loud_partial_amps - quiet_partial_amps
-    axs[2].plot(diff)
-    axs[2].set_title("Difference between Loud and Quiet Violin Partials")
-    plt.show()
-
-    if print_out:
-        # print normalized values for use in supercollider
-        print_array((diff + abs(np.min(diff)))/np.max(diff))
-
-
-if __name__ == '__main__':
-    samplerate, samples = wavfile.read('samples/amen_ride.wav')
-    if len(samples) == 2: # convert to mono
-        samples = samples[:,0]
-    
+def peak_freqs(samples, samplerate, min_p = 20, max_p = 35, max_freq=None):
     x_f = np.abs(np.fft.rfft(samples))
     x_freqs = np.fft.rfftfreq(samples.size, 1/samplerate)
     for rel_thresh in np.linspace(0.5, 0.001, 100):
-        peaks, _ = signal.find_peaks(x_f, threshold=np.max(x_f)*0.2)
-        if len(peaks) > 20 and len(peaks) < 35:
+        peaks, _ = signal.find_peaks(x_f, threshold=np.max(x_f)*rel_thresh)
+        # cut out overlapping ride in bass sample, e.g.
+        peaks = list(filter(lambda ind: x_freqs[ind] < max_freq, peaks))
+        if len(peaks) > min_p and len(peaks) < max_p:
             break
+    return x_freqs[peaks]
 
-    print('var harmonics = ', [round(f, 2) for f in x_freqs[peaks]], ';', sep='')
-    get_envs(x_freqs[peaks], samplerate, samples, smooth=True)
+
+def read_mono(filename):
+    samplerate, samples = wavfile.read(filename)
+    if len(samples.shape) == 2: # convert to mono
+        samples = samples[:,0]
+    return samples, samplerate
+
+def supercollider_arrs(peak_freqs, samples, samplerate, smooth=True):
+    print('var harmonics = ', [round(f, 2) for f in peak_freqs], ';', sep='')
+    get_envs(peak_freqs, samplerate, samples, smooth)
+
+if __name__ == '__main__':
+    bass_samples, samplerate = read_mono('samples/amen_kick_2.wav')
+    bass_freqs = peak_freqs(bass_samples, samplerate, min_p=5, max_p=10, max_freq = 500)
+    supercollider_arrs(bass_freqs, bass_samples, samplerate)
+
+

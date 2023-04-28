@@ -11,8 +11,7 @@ https://www.youtube.com/watch?v=R0NVOcP8OGI
 */
 
 (
-SynthDef(\ride,{|freq=440, attackTime=1.0, sustainTime=1.0, releaseTime=1.5, amp=1.0, vibrato=0.5, pan=0.0|
-
+SynthDef(\ride,{|freq_ratio=1, attackTime=0.01, releaseTime=0.5, amp=1.0, pan=0.0|
 	var harmonics = [198.88, 2343.35, 2948.65, 3026.47, 3657.71, 3839.29, 4479.18, 4652.12, 4928.82, 5119.06, 5629.24, 5707.06, 5793.53, 5897.29, 6234.53, 6269.12, 6398.82, 6424.76, 6476.65, 6493.94, 6545.82, 7436.47, 7695.88, 7903.41, 9174.53, 10030.59];
 
 	var envs = [
@@ -44,83 +43,86 @@ SynthDef(\ride,{|freq=440, attackTime=1.0, sustainTime=1.0, releaseTime=1.5, amp
 		[0.865, 0.936, 0.982, 1.0, 0.998, 0.967, 0.919, 0.854, 0.78, 0.703, 0.625, 0.555, 0.489, 0.37, 0.34, 0.308, 0.268, 0.244, 0.209, 0.181, 0.162, 0.134],
 	];
 	// create the overall envelope specified by the user to create the "shape" of the note
-	//var overall_env = Env.linen(attackTime, sustainTime, releaseTime, amp, \welch).kr();
-	var duration = attackTime + sustainTime + releaseTime;
+	var overall_env = Env.perc(attackTime, releaseTime).kr(doneAction: 2);
+	var duration = attackTime + releaseTime;
 	var num_partials = envs.size();
 	// create an array of num_partials SinOscs, with the i-th index corresponding
 	// to the (i+1)-th partial
 	var n_samples = envs[0].size();
 	var ride = Array.fill(num_partials, {|i|
-		// interpolate between the g3 and b3 partial amplitudes
-		// using a similar method as mapValues on hw2 clipping interpolated
-		// values for frequencies not between g3 and b3
 		var samples = envs[i];
 		var f = harmonics[i];
-		// create new envelope based on sampled information, kill the envelope when done
-		// the array of amplitudes for a given partial are uniformly spaced, so we can use
-		// a scalar value for the time to create an envelope that lasts a total of duration seconds.
+		// create new envelope based on sampled information the array of amplitudes for a given partial are uniformly spaced,
+		// so we can use a scalar value for the time to create an envelope that lasts a total of duration seconds.
 		var env = EnvGen.kr(Env(samples, times: duration/n_samples));
-		p = i+1;
-		samples.postln;
 		SinOsc.ar(
-			freq: f,
-
-			mul: ( env ));
+			freq: f*freq_ratio, mul: env);
 	});
-	// note not using Done because each partial's envelope has doneAction: 2, meaning the synth gets freed
-	// when the envelope ends (this is equivalent to freeing the synth, as the synth count in the bottom
-	// right goes from 1s to 0s when the play call is over)
+
 	Out.ar(0, // output to the first bus
 		Pan2.ar( // pan and wrap in overall envelope
-			Env.perc().ar(doneAction: 2) * Mix.ar(ride), // combine the array of partials into one audio stream
+			overall_env * Mix.ar(ride)/10, // combine the array of partials into one audio stream
 			pos:pan // pan according to user-supplied argument
 		)
 	)
 }).add();
 
-Synth(\ride, [\attackTime, 0.001, \sustainTime, 0.1, \releaseTime, 0.1]);
+//Synth(\ride, [\freq_ratio, 1, \attackTime, 0.01, \releaseTime, 1]);
+SynthDef(\kick, {|freq_ratio=1, attackTime=0.01, releaseTime=0.2, amp=1.0, pan=0.0|
+	var harmonics = [68.23, 133.94, 146.57, 169.31, 179.42, 204.69];
+var envs = [[0.582, 0.69, 0.79, 0.876, 0.941, 0.986, 1.0, 0.986, 0.946, 0.884, 0.806, 0.717, 0.623, 0.53, 0.43, 0.352, 0.285, 0.197, 0.164, 0.118, 0.102, 0.09, 0.077, 0.066, 0.059, 0.056, 0.054, 0.047, 0.045, 0.043, 0.04, 0.036, 0.033, 0.03, 0.026, 0.023, 0.019, 0.016, 0.013, 0.011, 0.01, 0.008, 0.007, 0.005, 0.004, 0.003, 0.002, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+[0.674, 0.774, 0.86, 0.928, 0.975, 1.0, 0.995, 0.965, 0.913, 0.843, 0.761, 0.674, 0.585, 0.484, 0.405, 0.34, 0.247, 0.2, 0.17, 0.134, 0.113, 0.089, 0.075, 0.065, 0.058, 0.052, 0.045, 0.037, 0.033, 0.03, 0.027, 0.024, 0.022, 0.019, 0.017, 0.015, 0.013, 0.011, 0.01, 0.008, 0.007, 0.006, 0.005, 0.004, 0.003, 0.003, 0.002, 0.002, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+[0.674, 0.774, 0.86, 0.928, 0.975, 1.0, 0.995, 0.965, 0.913, 0.843, 0.761, 0.674, 0.585, 0.484, 0.405, 0.34, 0.247, 0.2, 0.17, 0.134, 0.113, 0.089, 0.075, 0.065, 0.058, 0.052, 0.045, 0.037, 0.033, 0.03, 0.027, 0.024, 0.022, 0.019, 0.017, 0.015, 0.013, 0.011, 0.01, 0.008, 0.007, 0.006, 0.005, 0.004, 0.003, 0.003, 0.002, 0.002, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+[0.674, 0.774, 0.86, 0.928, 0.975, 1.0, 0.995, 0.965, 0.913, 0.843, 0.761, 0.674, 0.585, 0.484, 0.405, 0.34, 0.247, 0.2, 0.17, 0.134, 0.113, 0.089, 0.075, 0.065, 0.058, 0.052, 0.045, 0.037, 0.033, 0.03, 0.027, 0.024, 0.022, 0.019, 0.017, 0.015, 0.013, 0.011, 0.01, 0.008, 0.007, 0.006, 0.005, 0.004, 0.003, 0.003, 0.002, 0.002, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+[0.674, 0.774, 0.86, 0.928, 0.975, 1.0, 0.995, 0.965, 0.913, 0.843, 0.761, 0.674, 0.585, 0.484, 0.405, 0.34, 0.247, 0.2, 0.17, 0.134, 0.113, 0.089, 0.075, 0.065, 0.058, 0.052, 0.045, 0.037, 0.033, 0.03, 0.027, 0.024, 0.022, 0.019, 0.017, 0.015, 0.013, 0.011, 0.01, 0.008, 0.007, 0.006, 0.005, 0.004, 0.003, 0.003, 0.002, 0.002, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+[0.674, 0.774, 0.86, 0.928, 0.975, 1.0, 0.995, 0.965, 0.913, 0.843, 0.761, 0.674, 0.585, 0.484, 0.405, 0.34, 0.247, 0.2, 0.17, 0.134, 0.113, 0.089, 0.075, 0.065, 0.058, 0.052, 0.045, 0.037, 0.033, 0.03, 0.027, 0.024, 0.022, 0.019, 0.017, 0.015, 0.013, 0.011, 0.01, 0.008, 0.007, 0.006, 0.005, 0.004, 0.003, 0.003, 0.002, 0.002, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+];
+	// create the overall envelope specified by the user to create the "shape" of the note
+	var overall_env = Env.perc(attackTime, releaseTime).kr(doneAction: 2);
+	var duration = attackTime + releaseTime;
+	var num_partials = envs.size();
+	// create an array of num_partials SinOscs, with the i-th index corresponding
+	// to the (i+1)-th partial
+	var n_samples = envs[0].size();
+	var kick = Array.fill(num_partials, {|i|
+		var samples = envs[i];
+		var f = harmonics[i];
+		// create new envelope based on sampled information the array of amplitudes for a given partial are uniformly spaced,
+		// so we can use a scalar value for the time to create an envelope that lasts a total of duration seconds.
+		var env = EnvGen.kr(Env(samples, times: duration/n_samples));
+		SinOsc.ar(
+			freq: f*freq_ratio, mul: env);
+	});
+
+	Out.ar(0, // output to the first bus
+		Pan2.ar( // pan and wrap in overall envelope
+			overall_env * Mix.ar(kick), // combine the array of partials into one audio stream
+			pos:pan // pan according to user-supplied argument
+		)
+	)
+}).add();
+
+Synth(\kick);
 )
 
 
+(
+[1,2,3,4,5].at(0..3);
+
+)
 
 (
-SynthDef(\kick,{|out= 0 freq = 440 amp = 0.1 ringTime=10.0 releaseTime=1.0 distortion = 0.1 pan=(-0.1)|
-
-	var impulse, filter, env;
-
-  	impulse = Impulse.ar(0);
-
-	filter = Ringz.ar(impulse,XLine.ar(freq,60,0.1),ringTime); // Ringing filter
-
-	env = EnvGen.ar(Env.perc(0.001,releaseTime),doneAction:2);
-
-	filter = (1.0-distortion)*filter + (distortion*(filter.distort));
-	Out.ar(out,Pan2.ar(filter*env*amp,pan));
-
-}).add();
-
-SynthDef(\snare, {
-	var pink_noise = PinkNoise.ar();
-	var env = EnvGen.ar(Env.perc(0.01, 0.3))*1;
-    Out.ar(0,Pan2.ar(pink_noise*env, 0, 1));
-}).add();
-
-SynthDef(\hihat, {arg out = 0, amp = 0.5, att = 0.01, rel = 0.2, ffreq = 6000, pan = 0;
-	var env, snd;
+SynthDef(\snare, {arg out = 0, amp = 0.1, sinfreq = 180, att = 0.01, rel = 0.2, ffreq = 2000, pan = 0;
+	var env, snd1, snd2, sum;
 	env = Env.perc(att, rel, amp).kr(doneAction: 2);
-	snd = WhiteNoise.ar;
-	snd = HPF.ar(in: snd, freq: ffreq, mul: env);
-	Out.ar(out, Pan2.ar(snd, pan));
-}).add();
-
-SynthDef(\ride, {|center_freq = 6000, amp = 1, attackT = 0.01, releaseT = 0.1, pan = 0|
-	var env = Env.perc(attackT, releaseT).kr(doneAction: 2) * amp;
-	var ride = Ringz.ar(WhiteNoise.ar(), center_freq);
-	Out.ar(0,
-		Pan2.ar(
-			ride,
-			pos: pan)
+	snd1 = HPF.ar(
+		in: WhiteNoise.ar,
+		freq: ffreq,
+		mul: env
 	);
+	snd2 = SinOsc.ar(freq: sinfreq, mul: env);
+	sum = snd1 + snd2;
+	Out.ar(out, Pan2.ar(sum, pan));
 }).add();
 
 SynthDef(\crash, { arg amp = 1;
@@ -129,8 +131,6 @@ SynthDef(\crash, { arg amp = 1;
   Out.ar(0, Pan2.ar(HPF.ar(whiteNoise, freq: 7040)) * 4 * amp);
 }).add;
 )
-
-
 
 
 (
@@ -152,13 +152,13 @@ m1 = Ppar([
 ]);
 
 m3 = Ppar([
-	~rhythm.(\hihat, [1/2, 1/2, 1/2, 1/2, 1/2, 1/2, 1/2, 1/2]),
+	~rhythm.(\ride, [1/2, 1/2, 1/2, 1/2, 1/2, 1/2, 1/2, 1/2]),
 	~rhythm.(\snare, [Rest(1), 3/4, 1/4, Rest(1/4), 1/4, Rest(1), 1/2]),
 	~rhythm.(\kick, [1/2, 1/2, Rest(3/2), 1/2, Rest(1)])
 ]);
 
 m4 = Ppar([
-	~rhythm.(\hihat, [1/2, 1/2, 1/2, 1/2, 1/2, Rest(1/2), 1/2, 1/2]),
+	~rhythm.(\ride, [1/2, 1/2, 1/2, 1/2, 1/2, Rest(1/2), 1/2, 1/2]),
 	~rhythm.(\crash, [Rest(5/2), 3/2]),
 	~rhythm.(\snare, [Rest(1/4), 1/4, Rest(1/2), 3/4, 1/4, Rest(1/4), 1/4, Rest(1), 1/2]),
 	~rhythm.(\kick, [Rest(1/2), 1/4, 1/4, Rest(3/2), 1/2, Rest(1)])
@@ -171,9 +171,3 @@ Pseq([m1, m1, m3, m4], inf).play(t);
 //Pseq([m1, m1, m3, m4], inf).play(t3);
 //Pseq([m1, m1, m3, m4], inf).play(t4);
 )
-
-SynthDef("snare", {
-	var pink_noise = PinkNoise.ar();
-	var env = EnvGen.ar(Env.perc(0.01, 0.3))*1;
-    Out.ar(0,Pan2.ar(pink_noise*env, 0, 1));
-}).play;

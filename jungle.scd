@@ -116,7 +116,28 @@ var partial_env_amps = [0.767, 0.857, 0.931, 0.979, 1.0, 0.995, 0.966, 0.917, 0.
 	)
 }).add();
 
-Synth(\snare);
+
+//stealthissound
+
+SynthDef(\fatvelocitybass,{|out= 0 freq = 440 amp = 0.1 gate=1 cutoff= 12000 rq=0.25 lagTime=0.01 pan = 0.0|
+
+	var lfo, osc, filter, env;
+
+	var basefreq =  ((freq.lag(lagTime).cpsmidi)+[0,11.95,31.03]).midicps;
+
+	osc = Saw.ar(basefreq,[0.5,0.4,0.1]); //+PinkNoise.ar(Line.kr(1.0,0,0.03));
+
+	env = EnvGen.ar(Env.adsr(0.01,1.0,1.0,0.25),gate,doneAction:2);
+
+	filter = BLowPass4.ar(osc,100+((amp.squared)*(freq+cutoff)),rq);
+
+	Out.ar(out,Pan2.ar(Mix(filter)*env*amp*0.8,pan));
+
+}).add;
+
+
+
+//Synth(\snare);
 
 SynthDef(\crash, {|freq_ratio=1, attackTime=0.1, releaseTime=1, amp=1.0, pan=0.0|
 var amps = [-36.226, -35.915, -35.481, -35.133, -30.474, -36.17, -33.159, -35.091, -34.793, -31.982, -35.927, -32.5, -35.773, -35.727, -35.645, -35.511, -35.191, -34.066, -34.606, -34.348, -35.374, -32.744].dbamp;
@@ -154,15 +175,25 @@ var partial_env_amps = [0.102, 0.113, 0.126, 0.139, 0.152, 0.168, 0.194, 0.219, 
 )
 
 (
- var t2, t3,t4, unit;
+ var t2, t3,t4, unit, min1, min2, min3, min4, min5, m3_fat_velocity, fat_vel;
 ~rhythm = {|instrument, durs, amp=1|
 	Pbind(\instrument, instrument,
 		\amp, Pseq(amp, inf),
 		\dur, Pseq(durs, 1)
 	)
 };
+
+~inst_play_notes = {|inst=\epiano, notes, amp=1.0|
+	Pbind(
+		\instrument, inst,
+		\legato, 1,
+		\amp, amp,
+		[\midinote, \dur],
+		Pseq(notes,1)
+    )
+};
 // 136 bpm
-unit = 136/60;//*5/4;
+unit = 150/60;//*5/4;
 t = TempoClock(unit);
 t2 = TempoClock(unit/3);
 t3 = TempoClock(unit/6);
@@ -180,7 +211,15 @@ t3 = TempoClock(unit/6);
 	m3 = Ppar([
 		~rhythm.(\ride, [1/2, 1/2, 1/2, 1/2, 1/2, 1/2, 1/2, 1/2], [amp]),
 		~rhythm.(\snare, [Rest(1), 3/4, 1/4, Rest(1/4), 1/4, Rest(1), 1/2], amp*[0,1,ghost_amp, 0, ghost_amp, 0, 1]),
-		~rhythm.(\kick, [1/2, 1/2, Rest(3/2), 1/2, Rest(1)], [amp])
+		~rhythm.(\kick, [1/2, 1/2, Rest(3/2), 1/2, Rest(1)], [amp]),
+		~instplaynotes.(\fatvelocitybass, \midinote, Pseq([13,18,3,1,3,1,3,1,4,1,3]+36, amp: 1)
+	]);
+	inst_play_notes.(\epiano, lower_fivepat_right, amp: 1
+	m3_fat_velocity = Ppar([
+		~rhythm.(\ride, [1/2, 1/2, 1/2, 1/2, 1/2, 1/2, 1/2, 1/2], [amp]),
+		~rhythm.(\snare, [Rest(1), 3/4, 1/4, Rest(1/4), 1/4, Rest(1), 1/2], amp*[0,1,ghost_amp, 0, ghost_amp, 0, 1]),
+		~rhythm.(\kick, [1/2, 1/2, Rest(3/2), 1/2, Rest(1)], [amp]),
+		~rhythm.(\fatvelocitybass,[1/2, 1/2, 1/2, 1/2, 1/2, 1/2, 1/2, 1/2], [amp])
 	]);
 
 	m4 = Ppar([
@@ -189,10 +228,20 @@ t3 = TempoClock(unit/6);
 		~rhythm.(\snare, [Rest(1/4), 1/4, Rest(1/2), 3/4, 1/4, Rest(1/4), 1/4, Rest(1), 1/2], amp*[0,ghost_amp,0,1,ghost_amp, 0, ghost_amp, 0, 1]),
 		~rhythm.(\kick, [Rest(1/2), 1/4, 1/4, Rest(3/2), 1/2, Rest(1)], [amp])
 	]);
-	Pseq([m1, m1, m3, m4], inf)
+
+
+	min1 = [m3, m3, m4, m3_fat_velocity, m3, m3, m4, m3,m3, m3, m4, m3,m3, m3, m4, m3, m3, m3, m4, m3, m3, m3, m4, m3,m3, m3, m4, m3,m3, m3, m4, m3,m3, m3, m4];
+
+	min2 = [m3, m3, m4, m3, m3, m3, m4, m3,m3, m3, m4, m3,m3, m3, m4, m3, m3, m3, m4, m3, m3, m3, m4, m3,m3, m3, m4, m3,m3, m3, m4, m3,m3, m3, m4];
+
+	min3 = [m3, m3, m4, m3, m3, m3, m4, m3,m3, m3, m4, m3,m3, m3, m4, m3, m3, m3, m4, m3, m3, m3, m4, m3,m3, m3, m4, m3,m3, m3, m4, m3,m3, m3, m4];
+
+	min4 = [m3, m3, m4, m3, m3, m3, m4, m3,m3, m3, m4, m3,m3, m3, m4, m3, m3, m3, m4, m3, m3, m3, m4, m3,m3, m3, m4, m3,m3, m3, m4, m3,m3, m3, m4];
+
+	Pseq(min1 ++ min2 ++ min3 ++ min4 ++ min5, 1 )
 };
 
-// Pbind(\instrument, \kick, \amp, 0.5, \freq_ratio, 2, \dur, Prand([Pseq([1/10],10), Pseq([1/7], 7)], inf)).play(t);
+Pbind(\instrument, \kick, \amp, 0.5, \freq_ratio, 2, \dur, Prand([Pseq([1/10],10), Pseq([1/7], 7)], inf)).play(t);
 FreqScope.new;
 ~main_break.().play(t);
 //~main_break.(amp: 1).play(t2);

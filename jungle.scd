@@ -117,30 +117,6 @@ var partial_env_amps = [0.767, 0.857, 0.931, 0.979, 1.0, 0.995, 0.966, 0.917, 0.
 	)
 }).add();
 
-<<<<<<< HEAD
-=======
-
-//stealthissound
-
-SynthDef(\fatvelocitybass,{|out= 0 freq = 440 amp = 0.1 gate=1 cutoff= 12000 rq=0.25 lagTime=0.01 pan = 0.0|
-
-	var lfo, osc, filter, env;
-
-	var basefreq =  ((freq.lag(lagTime).cpsmidi)+[0,11.95,31.03]).midicps;
-
-	osc = Saw.ar(basefreq,[0.5,0.4,0.1]); //+PinkNoise.ar(Line.kr(1.0,0,0.03));
-
-	env = EnvGen.ar(Env.adsr(0.01,1.0,1.0,0.25),gate,doneAction:2);
-
-	filter = BLowPass4.ar(osc,100+((amp.squared)*(freq+cutoff)),rq);
-
-	Out.ar(out,Pan2.ar(Mix(filter)*env*amp*0.8,pan));
-
-}).add;
-
-
-
->>>>>>> 7c5e09eaf22a280b1598fe51a5d4084cc9ad3d3c
 //Synth(\snare);
 
 SynthDef(\crash, {|freq_ratio=1, attackTime=0.1, releaseTime=1, amp=1.0, pan=0.0|
@@ -177,24 +153,6 @@ var partial_env_amps = [0.102, 0.113, 0.126, 0.139, 0.152, 0.168, 0.194, 0.219, 
 
 //Synth(\crash);
 
-SynthDef(\synthdistortion, {|out = 0 gate= 1|
-	var source = In.ar(out,2);
-	var env = Linen.kr(gate, 0.0, 1, 0.1, 2);
-	var abs, excess, output;
-
-	abs = source.abs;
-
-	excess = (abs-0.1).max(0.0).min(0.9)/0.9;
-
-	//original plus sinusoidal perturbation of amount based on absolute amplitude
-	output = source+(excess*(sin(excess*2pi*5)*0.5-0.5));
-
-	output = Limiter.ar(output, 0.9); // [SP] added Limiter to keep output levels below 1
-
-	XOut.ar(out,env,output*env);
-
-}).add;
-
 //chorus and compression
 SynthDef(\choruscompresseffect, {|in = 21 out = 0 gate = 1|
 	var source = In.ar(in,2);
@@ -212,45 +170,19 @@ SynthDef(\choruscompresseffect, {|in = 21 out = 0 gate = 1|
 	Out.ar(out, chorus);
 
 }).add;
-
-SynthDef(\filtereffect, {|out =21 gate= 1|
-	var source = In.ar(out,2);
-	var env = Linen.kr(gate, 0.0, 1, 0.1, 2);
-	var output;
-
-	output = BLowPass.ar(BLowPass.ar(source,SinOsc.ar(0.25,0,5000,5500),0.4),(200+(5000*SinOsc.ar(4.01,0.5,0.5,0.5))),0.6);
-
-	//output = BLowPass.ar(source,SinOsc.ar(0.275,0,5000,5500),0.1);
-
-	XOut.ar(out, env, output * env);
-
-}).add;
 )
 
 (
-<<<<<<< HEAD
- var t2, t3,t4, unit, kick_pitch, drone1, drone2, drone3;
-=======
- var t2, t3,t4, unit, min1, min2, min3, min4, min5, m3_fat_velocity, fat_vel;
->>>>>>> 7c5e09eaf22a280b1598fe51a5d4084cc9ad3d3c
-~rhythm = {|instrument, durs, amp=1|
+var t2, t3,t4, unit, kick_pitch, drone1, drone2, drone3, reps;
+~rhythm = {|instrument, durs, amp=#[1], freqs=1|
 	Pbind(\instrument, instrument,
 		\amp, Pseq(amp, inf),
-		\dur, Pseq(durs, 1)
+		\dur, Pseq(durs, 1),
+		\freq_ratio, freqs
 	)
 };
-
-~inst_play_notes = {|inst=\epiano, notes, amp=1.0|
-	Pbind(
-		\instrument, inst,
-		\legato, 1,
-		\amp, amp,
-		[\midinote, \dur],
-		Pseq(notes,1)
-    )
-};
 // 136 bpm
-unit = 150/60;//*5/4;
+unit = 138/60;//*5/4;
 t = TempoClock(unit);
 t2 = TempoClock(unit/3);
 t3 = TempoClock(unit/6);
@@ -258,46 +190,41 @@ t4 = TempoClock(unit*4/3);
 
 46.midicps.postln;
 
-~main_break = {|amp=1|
+~main_break = {|amp=1, ride_pat=1, rel_dur=1|
 	var m1, m3, m4;
 	var ghost_amp = 0.5;
+	var main_snare = Prand([3/4, Pseq([1/4, 1/4, 1/4])]);
+	var main_bass = Prand([Pseq([1/2,1/2]), Pseq([1/4, 1/4, 1/4, 1/4])]);
+	var ride = switch (ride_pat)
+    {1}   { ~rhythm.(\ride, rel_dur*[1/2, 1/2, 1/2, 1/2, 1/2, 1/2, 1/2, 1/2], [amp])}
+	{2} { ~rhythm.(\ride, rel_dur*[Rest(1/2), 1, 1, 1, 1/2]) };
 	m1 = Ppar([
-		~rhythm.(\ride, [1/2, 1/2, 1/2, 1/2, 1/2, 1/2, 1/2, 1/2], [amp]),
-		~rhythm.(\snare, [Rest(1), 3/4, 1/4, Rest(1/4), 1/4, Rest(1/2), 3/4, 1/4], amp*[0, 1, ghost_amp, 0, ghost_amp, 0, 1, ghost_amp/2]),
-		~rhythm.(\kick, [1/2, 1/2, Rest(3/2), 1/4, 1/4, Rest(1)], [amp])
+		ride,
+		~rhythm.(\snare, rel_dur*[Rest(1), main_snare, 1/4, Rest(1/4), 1/4, Rest(1/2), 3/4, 1/4], amp*[0, 1, ghost_amp, 0, ghost_amp, 0, 1, ghost_amp/2]),
+		~rhythm.(\kick, [main_bass, Rest(3/2), 1/4, 1/4, Rest(1)], [amp])
 	]);
 
 	m3 = Ppar([
-		~rhythm.(\ride, [1/2, 1/2, 1/2, 1/2, 1/2, 1/2, 1/2, 1/2], [amp]),
-		~rhythm.(\snare, [Rest(1), 3/4, 1/4, Rest(1/4), 1/4, Rest(1), 1/2], amp*[0,1,ghost_amp, 0, ghost_amp, 0, 1]),
-		~rhythm.(\kick, [1/2, 1/2, Rest(3/2), 1/2, Rest(1)], [amp]),
-		~instplaynotes.(\fatvelocitybass, \midinote, Pseq([13,18,3,1,3,1,3,1,4,1,3]+36, amp: 1)
-	]);
-	inst_play_notes.(\epiano, lower_fivepat_right, amp: 1
-	m3_fat_velocity = Ppar([
-		~rhythm.(\ride, [1/2, 1/2, 1/2, 1/2, 1/2, 1/2, 1/2, 1/2], [amp]),
-		~rhythm.(\snare, [Rest(1), 3/4, 1/4, Rest(1/4), 1/4, Rest(1), 1/2], amp*[0,1,ghost_amp, 0, ghost_amp, 0, 1]),
-		~rhythm.(\kick, [1/2, 1/2, Rest(3/2), 1/2, Rest(1)], [amp]),
-		~rhythm.(\fatvelocitybass,[1/2, 1/2, 1/2, 1/2, 1/2, 1/2, 1/2, 1/2], [amp])
+		ride,
+		~rhythm.(\snare, rel_dur*[Rest(1), main_snare, 1/4, Rest(1/4), 1/4, Rest(1), 1/2], amp*[0,1,ghost_amp, 0, ghost_amp, 0, 1]),
+		~rhythm.(\kick, rel_dur*[main_bass, Rest(3/2), 1/2, Rest(1)], [amp]),
 	]);
 
 	m4 = Ppar([
-		~rhythm.(\ride, [1/2, 1/2, 1/2, 1/2, 1/2, Rest(1/2), 1/2, 1/2], [amp]),
-		~rhythm.(\crash, [Rest(5/2), 3/2], [amp]),
-		~rhythm.(\snare, [Rest(1/4), 1/4, Rest(1/2), 3/4, 1/4, Rest(1/4), 1/4, Rest(1), 1/2], amp*[0,ghost_amp,0,1,ghost_amp, 0, ghost_amp, 0, 1]),
-		~rhythm.(\kick, [Rest(1/2), 1/4, 1/4, Rest(3/2), 1/2, Rest(1)], [amp])
+		ride,
+		~rhythm.(\crash, rel_dur*[Rest(5/2), 3/2], [amp]),
+		~rhythm.(\snare, rel_dur*[Rest(1/4), 1/4, Rest(1/2), main_snare, 1/4, Rest(1/4), 1/4, Rest(1), 1/2], amp*[0,ghost_amp,0,1,ghost_amp, 0, ghost_amp, 0, 1]),
+		~rhythm.(\kick, rel_dur*[Rest(1/2), 1/4, 1/4, Rest(3/2), 1/2, Rest(1)], [amp])
 	]);
+	Pseq([m1,m1,m3,m4]);
+};
 
-
-	min1 = [m3, m3, m4, m3_fat_velocity, m3, m3, m4, m3,m3, m3, m4, m3,m3, m3, m4, m3, m3, m3, m4, m3, m3, m3, m4, m3,m3, m3, m4, m3,m3, m3, m4, m3,m3, m3, m4];
-
-	min2 = [m3, m3, m4, m3, m3, m3, m4, m3,m3, m3, m4, m3,m3, m3, m4, m3, m3, m3, m4, m3, m3, m3, m4, m3,m3, m3, m4, m3,m3, m3, m4, m3,m3, m3, m4];
-
-	min3 = [m3, m3, m4, m3, m3, m3, m4, m3,m3, m3, m4, m3,m3, m3, m4, m3, m3, m3, m4, m3, m3, m3, m4, m3,m3, m3, m4, m3,m3, m3, m4, m3,m3, m3, m4];
-
-	min4 = [m3, m3, m4, m3, m3, m3, m4, m3,m3, m3, m4, m3,m3, m3, m4, m3, m3, m3, m4, m3, m3, m3, m4, m3,m3, m3, m4, m3,m3, m3, m4, m3,m3, m3, m4];
-
-	Pseq(min1 ++ min2 ++ min3 ++ min4 ++ min5, 1 )
+~latin_break = {|amp=1|
+	Pn(Ppar([
+	~rhythm.(\ride, [1/2, 1/2,1/4,1/4, Rest(1/4), 1/2, 1/2, 1/4, 1/4, Rest(1/4), 1/2], [amp*1.5]),
+	~rhythm.(\snare, [Rest(1/2), 1/2, Rest(1/2), 1/2, Rest(1/2), 1/2, Rest(1/2), 1/2], [amp]),
+	~rhythm.(\kick, [1/2, Rest(1/2), 1/4, 1/4, Rest(1/4), 1/2, 1/4, Rest(1/4), 1/4, 1/4, Rest(3/4)], [amp])
+	]), 4);
 };
 
 ~kick_pitch = 46.midicps;
@@ -305,26 +232,39 @@ drone1 = 53.midicps/~kick_pitch;
 drone2 = 52.midicps/~kick_pitch;
 drone3 = 48.midicps/~kick_pitch;
 
-~drone_pitches = Pseq([Pseq([drone1], 10), Pseq([drone2], 10), Pseq([drone3], 20)], inf);
-~drone_pitches2 = Prand([Pseq([0.4], 20), Pseq([0.45], 20), Pseq([0.6], 20)], inf);
+~drone_pitches = Pseq([Pseq([drone1], 10), Pseq([drone2], 10), Pseq([drone3], 20)], 2);
+~drone_pitches2 = Prand([Pseq([0.4], 20), Pseq([0.45], 20), Pseq([0.6], 20)], 4);
 
-// Pbind(\instrument, \kick, \noise_amp, 0, \out, 0, \amp, 0.3, \freq_ratio, ~drone_pitches, \dur, 1/5).play(t);
 
-Pfx(
-	//Pfx(
-		Pbind(\instrument, \kick, \noise_amp, 0, \out, 21, \amp, 0.2, \freq_ratio, ~drone_pitches, \dur, 1/5),
-		\choruscompresseffect//),
-	//\filtereffect
+~drone1 = {
+	Pfx(
+		Pbind(\instrument, \kick, \noise_amp, 0, \out, 21, \amp, 0.15, \freq_ratio, ~drone_pitches, \dur, 1/5),
+		\choruscompresseffect
+	);
+};
+
+~drone2 = {
+	Pfx(
+		Pbind(\instrument, \kick, \noise_amp, 0, \out, 21, \amp, 0.1, \freq_ratio, ~drone_pitches2, \dur, 1/5),
+		\choruscompresseffect
+	);
+};
+
+reps = 3;
+
+Pseq(
+	[
+		Pn(~main_break.(0.5), 1),
+		Pn(Ppar([~main_break.(0.5), ~drone2.()]), reps),
+		Pn(Ppar([~main_break.(0.5, ride_pat: 2), ~drone1.()]), reps),
+		Pn(Ppar([~latin_break.(0.5), ~drone1.()]), reps),
+		Pn(Ppar([~latin_break.(0.4), ~main_break.(0.4, ride_pat: 2), ~drone1.()]), reps),
+		Ppar([Pn(Ppar([~main_break.(0.5, ride_pat: 1)]), reps), Pn(~main_break.(0.5, ride_pat: 1, rel_dur: 3), reps/3)]),
+		Ppar([Pn(Ppar([~main_break.(0.5, ride_pat: 1), ~drone2.()]), reps), Pn(~main_break.(0.5, ride_pat: 1, rel_dur: 3), reps/3)]),
+	]
 ).play(t);
-
-// FreqScope.new;
-~main_break.(0.5).play(t);
-//~main_break.(amp: 0.5).play(t2);
-//~main_break.(amp: 1).play(t3);
-// ~main_break.(amp:0.5).play(t4);
 )
 
-//play {SinOsc.ar(115)  ! 2};
 s.prepareForRecord;
 
 s.record;

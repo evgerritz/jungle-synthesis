@@ -7,6 +7,7 @@ TODO:
 1. go crazy with effects, sequencing, layering, tempo (Pbind)
    - cool beat, with some randomness + random
    - overlaid slow melodic drone (snare)
+   - randomly varying tones
 2. Make it sound AWESOME!!!!
 
 https://www.youtube.com/watch?v=R0NVOcP8OGI
@@ -46,7 +47,7 @@ var partial_env_amps = [0.359, 0.412, 0.479, 0.539, 0.598, 0.653, 0.703, 0.756, 
 
 //Synth(\ride, [\freq_ratio, 1, \attackTime, 0.01, \releaseTime, 1]);
 
-SynthDef(\kick, {|freq_ratio=1, attackTime=0.001, releaseTime=0.6, amp=1.0, pan=0.0, noise_amp=0|
+SynthDef(\kick, {|freq_ratio=1, attackTime=0.001, releaseTime=0.6, amp=1.0, pan=0.0, noise_amp=1, out=0|
 var amps = [-21.136, -29.981, -15.26, -23.604, -24.741, -20.489, -31.786, -31.053, -32.427, -34.03, -33.197].dbamp;
 var harmonics = [69.98, 91.52, 118.43, 156.12, 177.65, 193.8, 226.1, 242.25, 263.78, 306.85, 382.21];
 var partial_env_amps = [0.582, 0.69, 0.79, 0.876, 0.941, 0.986, 1.0, 0.986, 0.946, 0.884, 0.806, 0.717, 0.623, 0.53, 0.43, 0.352, 0.285, 0.197, 0.164, 0.118, 0.102, 0.09, 0.077, 0.066, 0.059, 0.056, 0.054, 0.047, 0.045, 0.043, 0.04, 0.036, 0.033, 0.029, 0.026, 0.022, 0.018, 0.015, 0.012];
@@ -75,14 +76,14 @@ var partial_env_amps = [0.582, 0.69, 0.79, 0.876, 0.941, 0.986, 1.0, 0.986, 0.94
 	kick = kick * amp * overall_env * no_pop_env;
 	kick = kick/15;
 
-	Out.ar(0, // output to the first bus
+	Out.ar(out, // output to the first bus
 		Pan2.ar( // pan and wrap in overall envelope
 			kick, pos: pan // pan according to user-supplied argument
 		)
 	)
 }).add();
 
-Synth(\kick);
+//Synth(\kick);
 
 
 SynthDef(\snare, {|freq_ratio=1, attackTime=0.01, releaseTime=0.5, amp=1.0, pan=0.0|
@@ -116,7 +117,7 @@ var partial_env_amps = [0.767, 0.857, 0.931, 0.979, 1.0, 0.995, 0.966, 0.917, 0.
 	)
 }).add();
 
-Synth(\snare);
+//Synth(\snare);
 
 SynthDef(\crash, {|freq_ratio=1, attackTime=0.1, releaseTime=1, amp=1.0, pan=0.0|
 var amps = [-36.226, -35.915, -35.481, -35.133, -30.474, -36.17, -33.159, -35.091, -34.793, -31.982, -35.927, -32.5, -35.773, -35.727, -35.645, -35.511, -35.191, -34.066, -34.606, -34.348, -35.374, -32.744].dbamp;
@@ -151,10 +152,59 @@ var partial_env_amps = [0.102, 0.113, 0.126, 0.139, 0.152, 0.168, 0.194, 0.219, 
 }).add();
 
 //Synth(\crash);
+
+SynthDef(\synthdistortion, {|out = 0 gate= 1|
+	var source = In.ar(out,2);
+	var env = Linen.kr(gate, 0.0, 1, 0.1, 2);
+	var abs, excess, output;
+
+	abs = source.abs;
+
+	excess = (abs-0.1).max(0.0).min(0.9)/0.9;
+
+	//original plus sinusoidal perturbation of amount based on absolute amplitude
+	output = source+(excess*(sin(excess*2pi*5)*0.5-0.5));
+
+	output = Limiter.ar(output, 0.9); // [SP] added Limiter to keep output levels below 1
+
+	XOut.ar(out,env,output*env);
+
+}).add;
+
+//chorus and compression
+SynthDef(\choruscompresseffect, {|in = 21 out = 0 gate = 1|
+	var source = In.ar(in,2);
+	var chorus;
+	var env = Linen.kr(gate, 0.1, 1, 0.1, 2);
+
+	chorus= Splay.ar(Array.fill(4,{
+		var maxdelaytime= rrand(0.005,0.02);
+
+		DelayC.ar(source[0], maxdelaytime,LFNoise1.kr(Rand(0.1,0.6),0.25*maxdelaytime,0.75*maxdelaytime) )
+	}));
+
+	chorus = Compander.ar(4*(source + chorus),source,0.4,1,4);
+
+	Out.ar(out, chorus);
+
+}).add;
+
+SynthDef(\filtereffect, {|out =21 gate= 1|
+	var source = In.ar(out,2);
+	var env = Linen.kr(gate, 0.0, 1, 0.1, 2);
+	var output;
+
+	output = BLowPass.ar(BLowPass.ar(source,SinOsc.ar(0.25,0,5000,5500),0.4),(200+(5000*SinOsc.ar(4.01,0.5,0.5,0.5))),0.6);
+
+	//output = BLowPass.ar(source,SinOsc.ar(0.275,0,5000,5500),0.1);
+
+	XOut.ar(out, env, output * env);
+
+}).add;
 )
 
 (
- var t2, t3,t4, unit;
+ var t2, t3,t4, unit, kick_pitch, drone1, drone2, drone3;
 ~rhythm = {|instrument, durs, amp=1|
 	Pbind(\instrument, instrument,
 		\amp, Pseq(amp, inf),
@@ -166,7 +216,9 @@ unit = 136/60;//*5/4;
 t = TempoClock(unit);
 t2 = TempoClock(unit/3);
 t3 = TempoClock(unit/6);
-// t4 = TempoClock(136/60*2);
+t4 = TempoClock(unit*4/3);
+
+46.midicps.postln;
 
 ~main_break = {|amp=1|
 	var m1, m3, m4;
@@ -192,14 +244,31 @@ t3 = TempoClock(unit/6);
 	Pseq([m1, m1, m3, m4], inf)
 };
 
-// Pbind(\instrument, \kick, \amp, 0.5, \freq_ratio, 2, \dur, Prand([Pseq([1/10],10), Pseq([1/7], 7)], inf)).play(t);
-FreqScope.new;
-~main_break.().play(t);
-//~main_break.(amp: 1).play(t2);
+~kick_pitch = 46.midicps;
+drone1 = 53.midicps/~kick_pitch;
+drone2 = 52.midicps/~kick_pitch;
+drone3 = 48.midicps/~kick_pitch;
+
+~drone_pitches = Pseq([Pseq([drone1], 10), Pseq([drone2], 10), Pseq([drone3], 20)], inf);
+~drone_pitches2 = Prand([Pseq([0.4], 20), Pseq([0.45], 20), Pseq([0.6], 20)], inf);
+
+// Pbind(\instrument, \kick, \noise_amp, 0, \out, 0, \amp, 0.3, \freq_ratio, ~drone_pitches, \dur, 1/5).play(t);
+
+Pfx(
+	//Pfx(
+		Pbind(\instrument, \kick, \noise_amp, 0, \out, 21, \amp, 0.2, \freq_ratio, ~drone_pitches, \dur, 1/5),
+		\choruscompresseffect//),
+	//\filtereffect
+).play(t);
+
+// FreqScope.new;
+~main_break.(0.5).play(t);
+//~main_break.(amp: 0.5).play(t2);
 //~main_break.(amp: 1).play(t3);
-//~main_break.(amp:0.5).play(t4);
+// ~main_break.(amp:0.5).play(t4);
 )
 
+//play {SinOsc.ar(115)  ! 2};
 s.prepareForRecord;
 
 s.record;

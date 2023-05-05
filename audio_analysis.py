@@ -84,16 +84,62 @@ def get_envs(freqs, samplerate, samples, smooth=True):
         print_array(amps)
     print('];')
 
-def peak_freqs(samples, samplerate, min_p = 20, max_p = 35, max_freq=None):
+def get_xf(samples, samplerate):
     x_f = np.abs(np.fft.rfft(samples))
     x_freqs = np.fft.rfftfreq(samples.size, 1/samplerate)
-    for rel_thresh in np.linspace(0.5, 0.001, 100):
-        peaks, _ = signal.find_peaks(x_f, threshold=np.max(x_f)*rel_thresh)
+    return x_f, x_freqs
+
+def peak_freqs(x_f, x_freqs, min_p = 20, max_p = 35, max_freq=None):
+    for rel_thresh in np.linspace(10, 0.001, 100):
+        peaks, _ = signal.find_peaks(x_f, threshold=rel_thresh)
         # cut out overlapping ride in bass sample, e.g.
-        peaks = list(filter(lambda ind: x_freqs[ind] < max_freq, peaks))
+        if max_freq:
+            peaks = list(filter(lambda ind: x_freqs[ind] < max_freq, peaks))
         if len(peaks) > min_p and len(peaks) < max_p:
+            print('correct_number')
             break
     return x_freqs[peaks]
+
+def peak_freqs2(x_f, x_freqs, min_p = 20, max_p = 35, max_freq=None, dist=1):
+    for height_thresh in np.max(x_f)*np.linspace(1, 10, 1000):
+        peaks, _ = signal.find_peaks(x_f, height=height_thresh, distance = dist)
+        if len(peaks) < 1112:
+            print(len(peaks))
+        # cut out overlapping ride in bass sample, e.g.
+        if max_freq:
+            peaks = list(filter(lambda ind: x_freqs[ind] < max_freq, peaks))
+        if len(peaks) > min_p and len(peaks) < max_p:
+            print('height thresh:', height_thresh)
+            break
+    else:
+        print('failed')
+    return x_freqs[peaks]
+
+def get_freq_amps(filename):
+    lines = open(filename).readlines()[1:]
+    # trim trailing newline
+    lines = [line[:-1] for line in lines]
+    # split around tab
+    lines = [line.split() for line in lines]
+    # convert to numbers
+    freq_amps = [[float(freq), float(amp)] for freq, amp in lines]
+    # round to 3 digits
+    freq_amps = [[round(freq,3), round(amp,3)] for freq, amp in freq_amps]
+    freq_amps = np.array(freq_amps)
+    return freq_amps
+
+def print_amp_of_freqs(freq_amps, freqs):
+    amps = []
+    for partial in freqs:
+        closest_partials = list(filter(lambda x: abs(x[0] - partial) < 3, freq_amps))
+        if closest_partials:
+            closest_partial = closest_partials[-1]
+            amps.append(round(closest_partial[1], 3))
+        else:
+            amps.append(0)
+
+    amps = [amp if amp != 0 else -40.0 for amp in amps]
+    print('var amps = ', amps, '.dbamp;', sep='')
 
 
 def read_mono(filename):
@@ -106,9 +152,20 @@ def supercollider_arrs(peak_freqs, samples, samplerate, smooth=True):
     print('var harmonics = ', [round(f, 2) for f in peak_freqs], ';', sep='')
     get_envs(peak_freqs, samplerate, samples, smooth)
 
+def norm(x):
+    return (x - np.min(x)) / (np.max(x) - np.min(x))
+
 if __name__ == '__main__':
-    bass_samples, samplerate = read_mono('samples/amen_kick_2.wav')
-    bass_freqs = peak_freqs(bass_samples, samplerate, min_p=5, max_p=10, max_freq = 500)
-    supercollider_arrs(bass_freqs, bass_samples, samplerate)
+    samples, samplerate = read_mono('samples/amen_ride.wav')
+    freq_amps = get_freq_amps('samples/ride_spectrum.txt')
+    #x_f, x_freqs = get_xf(samples, samplerate)
+    #print(freq_amps)
+    freqs = peak_freqs2(freq_amps[:,1], freq_amps[:,0], min_p=10, max_p=20)
+    #plt.plot(freq_amps[:,0][:len(freq_amps)//4], freq_amps[:,1][:len(freq_amps)//4])
+    #plt.show()
+    #plt.plot(freq_amps[:,0], norm(freq_amps[:,1]))
+    #plt.show()
+    print_amp_of_freqs(freq_amps, freqs)
+    supercollider_arrs(freqs, samples, samplerate)
 
 

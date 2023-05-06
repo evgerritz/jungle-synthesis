@@ -11,8 +11,6 @@ def fourier_trans(x, samplerate):
     f, t, spec = signal.stft(x, samplerate, nperseg=1000)
     return spec, f, t
 
-
-
 for filename in files:
     samplerate, samples = wavfile.read(filename)
     stft = fourier_trans(samples,samplerate)

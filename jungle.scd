@@ -4,7 +4,15 @@ o = Server.local.options;
 o.memSize = 2.pow(20);
 s.reboot;
 
+
+s.prepareForRecord;
+
+s.record;
+
+s.stopRecording;
+
 (
+
 // synthdef based on isolated amen ride
 SynthDef(\ride,{|freq_ratio=1, attackTime=0.1, releaseTime=0.5, amp=1.0, pan=0.0|
 var amps = [-32.949, -35.036, -34.114, -31.87, -33.709, -36.305, -36.143, -35.805, -30.095, -34.574, -32.113, -34.575].dbamp;
@@ -82,7 +90,7 @@ var partial_env_amps = [0.582, 0.69, 0.79, 0.876, 0.941, 0.986, 1.0, 0.986, 0.94
 	)
 }).add();
 
-//Synth(\kick);
+// Synth(\kick);
 
 // synthdef based on amen kick/bass drum
 SynthDef(\snare, {|freq_ratio=1, attackTime=0.01, releaseTime=0.5, amp=1.0, pan=0.0|
@@ -153,7 +161,7 @@ var partial_env_amps = [0.102, 0.113, 0.126, 0.139, 0.152, 0.168, 0.194, 0.219, 
 	)
 }).add();
 
-//Synth(\crash);
+Synth(\crash);
 
 // effect taken from stealthissound.scd
 SynthDef(\choruscompresseffect, {|in = 21 out = 0 gate = 1|
@@ -400,9 +408,3 @@ Pseq(
 	]
 ).play(t);
 )
-
-s.prepareForRecord;
-
-s.record;
-
-s.stopRecording;

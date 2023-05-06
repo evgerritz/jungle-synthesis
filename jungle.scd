@@ -5,6 +5,7 @@ o.memSize = 2.pow(20);
 s.reboot;
 
 (
+// synthdef based on isolated amen ride
 SynthDef(\ride,{|freq_ratio=1, attackTime=0.1, releaseTime=0.5, amp=1.0, pan=0.0|
 var amps = [-32.949, -35.036, -34.114, -31.87, -33.709, -36.305, -36.143, -35.805, -30.095, -34.574, -32.113, -34.575].dbamp;
 var harmonics = [2444.02, 3127.7, 3197.68, 3332.26, 3348.41, 4721.16, 4748.07, 5167.97, 5587.87, 5604.02, 6093.9, 6761.43];
@@ -38,6 +39,7 @@ var partial_env_amps = [0.359, 0.412, 0.479, 0.539, 0.598, 0.653, 0.703, 0.756, 
 
 //Synth(\ride, [\freq_ratio, 1, \attackTime, 0.01, \releaseTime, 1]);
 
+// synthdef based on isolated  amen kick/bass drum
 SynthDef(\kick, {|freq_ratio=1, attackTime=0.001, releaseTime=0.6, amp=1.0, pan=0.0, noise_amp=1, out=0|
 var amps = [-21.136, -29.981, -15.26, -23.604, -24.741, -20.489, -31.786, -31.053, -32.427, -34.03, -33.197].dbamp;
 var harmonics = [69.98, 91.52, 118.43, 156.12, 177.65, 193.8, 226.1, 242.25, 263.78, 306.85, 382.21];
@@ -76,7 +78,7 @@ var partial_env_amps = [0.582, 0.69, 0.79, 0.876, 0.941, 0.986, 1.0, 0.986, 0.94
 
 //Synth(\kick);
 
-
+// synthdef based on amen kick/bass drum
 SynthDef(\snare, {|freq_ratio=1, attackTime=0.01, releaseTime=0.5, amp=1.0, pan=0.0|
 var amps = [-22.04, -29.097, -19.754, -26.962, -16.032, -19.528, -26.167, -28.874, -28.062, -28.321, -29.021, -28.224, -28.716, -27.695, -28.625].dbamp;
 var harmonics = [64.6, 236.86, 269.17, 333.76, 592.16, 947.46, 1894.92, 1970.29, 2002.59, 3154.61, 3736.01, 4629.64, 4920.34, 5124.9, 5211.04];
@@ -146,7 +148,7 @@ var partial_env_amps = [0.102, 0.113, 0.126, 0.139, 0.152, 0.168, 0.194, 0.219, 
 
 //chorus and compression
 SynthDef(\choruscompresseffect, {|in = 21 out = 0 gate = 1|
-	var source = In.ar(in,2)/2;
+	var source = In.ar(in,2);
 	var chorus;
 	var env = Linen.kr(gate, 0.1, 1, 0.1, 2);
 
@@ -222,13 +224,13 @@ drone3 = 48.midicps/~kick_pitch;
 	);
 };
 
-~main_break = {|amp=1, ride_pat=1, rel_dur=1, final_snare=1|
+~main_break = {|amp=1, ride_pat=1, rel_dur=1, final_snare=1, random=true|
 	var m1, m3, m4;
 	var ghost_amp = 0.5;
-	var main_snare = Prand([3/4, Pseq([1/4, 1/4, 1/4])]);
-	var main_bass = Prand([Pseq([1/2,1/2]), Pseq([1/4, 1/4, 1/4, 1/4])]);
+	var main_snare = if (random, {  Prand([3/4, Pseq([1/4, 1/4, 1/4])]) },{ 3/4 });
+	var main_bass = if (random, {  Prand([Pseq([1/2,1/2]), Pseq([1/4, 1/4, 1/4, 1/4])]) },{ Pseq([1/2,1/2]) });
 	var ride = switch (ride_pat)
-    {1}   { ~rhythm.(\ride, rel_dur*[1/2, 1/2, 1/2, 1/2, 1/2, 1/2, 1/2, 1/2], [amp])}
+    {1} { ~rhythm.(\ride, rel_dur*[1/2, 1/2, 1/2, 1/2, 1/2, 1/2, 1/2, 1/2], [amp])}
 	{2} { ~rhythm.(\ride, rel_dur*[Rest(1/2), 1, 1, 1, 1/2]) };
 	m1 = Ppar([
 		ride,
@@ -345,14 +347,11 @@ drone3 = 48.midicps/~kick_pitch;
 		Pn(Ppar([final_section, ~drone2.()]), final_reps)], 1)
 };
 
-
-
-
 reps = 4;
 
 Pseq(
 	[
-		/*Pn(~main_break.(0.5), 1),
+		Pn(~main_break.(0.5, random: false), 1),
 		Pn(Ppar([~main_break.(0.5), ~drone2.()]), reps),
 		Pn(Ppar([~main_break.(0.5, ride_pat: 2), ~drone1.()]), reps),
 		Pn(Ppar([~latin_break.(0.5), ~drone1.()]), reps),
@@ -360,13 +359,11 @@ Pseq(
 		Ppar([Pn(Ppar([~main_break.(0.5, ride_pat: 1)]), 3), Pn(~main_break.(0.5, ride_pat: 1, rel_dur: 3), 1)]),
 		Ppar([Pn(Ppar([~main_break.(0.5, ride_pat: 1), ~drone2.()]), 3), Pn(~main_break.(0.5, ride_pat: 1, rel_dur: 3), 1)]),
 		~groove.(),
-		~breakdown.(),*/
-		Pn(~main_break.(0.5, final_snare: 0), 1),
+		~breakdown.(),
+		Pn(~main_break.(0.5, final_snare: 0, random: false), 1)
 	]
 ).play(t);
 )
-
-FreqScope.new
 
 s.prepareForRecord;
 

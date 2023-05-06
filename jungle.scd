@@ -1,17 +1,8 @@
+// increasing server memory is recommended for better performance
+// there are often ~3500 ugens at once
 o = Server.local.options;
 o.memSize = 2.pow(20);
 s.reboot;
-
-/*
-TODO:
-1. go crazy with effects, sequencing, layering, tempo (Pbind)
-   - cool beat, with some randomness + random
-   - overlaid slow melodic drone (snare)
-   - randomly varying tones
-2. Make it sound AWESOME!!!!
-
-https://www.youtube.com/watch?v=R0NVOcP8OGI
-*/
 
 (
 SynthDef(\ride,{|freq_ratio=1, attackTime=0.1, releaseTime=0.5, amp=1.0, pan=0.0|
@@ -37,7 +28,7 @@ var partial_env_amps = [0.359, 0.412, 0.479, 0.539, 0.598, 0.653, 0.703, 0.756, 
 	noise = HPF.ar(noise, 4000)/10*noise_env;
 	ride = Mix.ar(ride)*partial_env + noise;  // combine the array of partials into one audio stream
 	ride = ride * amp * overall_env * no_pop_env;
-	ride = ride/2;
+	ride = ride/4;
 	Out.ar(0, // output to the first bus
 		Pan2.ar( // pan and wrap in overall envelope
 			ride, pos:pan // pan according to user-supplied argument
@@ -72,7 +63,7 @@ var partial_env_amps = [0.582, 0.69, 0.79, 0.876, 0.941, 0.986, 1.0, 0.986, 0.94
 	var noise = BrownNoise.ar();
 	noise = LPF.ar(noise, 250)*6*noise_amp;
 	kick = Mix.ar(kick)*partial_env;
-	kick = kick*10+noise*noise_env;  // combine the array of partials into one audio stream
+	kick = kick*10+noise*noise_env*noise_env;
 	kick = kick * amp * overall_env * no_pop_env;
 	kick = kick/15;
 
@@ -155,7 +146,7 @@ var partial_env_amps = [0.102, 0.113, 0.126, 0.139, 0.152, 0.168, 0.194, 0.219, 
 
 //chorus and compression
 SynthDef(\choruscompresseffect, {|in = 21 out = 0 gate = 1|
-	var source = In.ar(in,2);
+	var source = In.ar(in,2)/2;
 	var chorus;
 	var env = Linen.kr(gate, 0.1, 1, 0.1, 2);
 
@@ -170,27 +161,68 @@ SynthDef(\choruscompresseffect, {|in = 21 out = 0 gate = 1|
 	Out.ar(out, chorus);
 
 }).add;
+
+SynthDef(\filtereffect, {|out =0 gate= 1|
+	var source = In.ar(out,2);
+	var env = Linen.kr(gate, 0.0, 1, 0.1, 2);
+	var output;
+
+	output = BLowPass.ar(BLowPass.ar(source,SinOsc.ar(0.25,0,5000,5500),0.4),(200+(5000*SinOsc.ar(4.01,0.5,0.5,0.5))),0.6);
+
+	//output = BLowPass.ar(source,SinOsc.ar(0.275,0,5000,5500),0.1);
+
+	XOut.ar(out, env, output * env);
+
+}).add;
 )
 
 (
 var t2, t3,t4, unit, kick_pitch, drone1, drone2, drone3, reps;
-~rhythm = {|instrument, durs, amp=#[1], freqs=1|
+~rhythm = {|instrument, durs, amp=#[1], freqs=1, noise_amp=1|
 	Pbind(\instrument, instrument,
 		\amp, Pseq(amp, inf),
 		\dur, Pseq(durs, 1),
-		\freq_ratio, freqs
+		\freq_ratio, freqs,
+		\noise_amp, noise_amp
 	)
 };
 // 136 bpm
-unit = 138/60;//*5/4;
-t = TempoClock(unit);
-t2 = TempoClock(unit/3);
-t3 = TempoClock(unit/6);
-t4 = TempoClock(unit*4/3);
+~unit = 138/60;//*5/4;
+t = TempoClock(~unit);
 
-46.midicps.postln;
+~kick_pitch = 46.midicps;
+// this progression is supposed to sound like Gary Numan's M.E.
+drone1 = 53.midicps/~kick_pitch;
+drone2 = 52.midicps/~kick_pitch;
+drone3 = 48.midicps/~kick_pitch;
 
-~main_break = {|amp=1, ride_pat=1, rel_dur=1|
+~drone_pitches = Pseq([Pseq([drone1], 10), Pseq([drone2], 10), Pseq([drone3], 20)], 2);
+~drone_pitches2 = Prand([Pseq([0.4], 20), Pseq([0.45], 20), Pseq([0.6], 20)], 4);
+~drone_pitches3 = Prand([Pseq([0.5], 20), Pseq([2], 20), Pseq([3], 20)], 4);
+
+
+~drone1 = {|reps=1|
+	Pfx(
+		Pn(Pbind(\instrument, \kick, \noise_amp, 0, \out, 21, \amp, 0.15, \freq_ratio, ~drone_pitches, \dur, 1/5), reps),
+		\choruscompresseffect
+	);
+};
+
+~drone2 = {|reps=1|
+	Pfx(
+		Pn(Pbind(\instrument, \kick, \noise_amp, 0, \out, 21, \amp, 0.1, \freq_ratio, ~drone_pitches2, \dur, 1/5), reps),
+		\choruscompresseffect
+	);
+};
+
+~drone3 = {|reps=1|
+	Pfx(
+		Pn(Pbind(\instrument, \kick, \noise_amp, 0, \out, 21, \amp, 0.07, \freq_ratio, ~drone_pitches3, \dur, 1/5), reps),
+		\choruscompresseffect
+	);
+};
+
+~main_break = {|amp=1, ride_pat=1, rel_dur=1, final_snare=1|
 	var m1, m3, m4;
 	var ghost_amp = 0.5;
 	var main_snare = Prand([3/4, Pseq([1/4, 1/4, 1/4])]);
@@ -213,7 +245,8 @@ t4 = TempoClock(unit*4/3);
 	m4 = Ppar([
 		ride,
 		~rhythm.(\crash, rel_dur*[Rest(5/2), 3/2], [amp]),
-		~rhythm.(\snare, rel_dur*[Rest(1/4), 1/4, Rest(1/2), main_snare, 1/4, Rest(1/4), 1/4, Rest(1), 1/2], amp*[0,ghost_amp,0,1,ghost_amp, 0, ghost_amp, 0, 1]),
+		~rhythm.(\snare, rel_dur*[Rest(1/4), 1/4, Rest(1/2), main_snare, 1/4, Rest(1/4), 1/4, Rest(1), 1/2],
+			amp*[0,ghost_amp,0,1,ghost_amp, 0, ghost_amp, 0, final_snare]),
 		~rhythm.(\kick, rel_dur*[Rest(1/2), 1/4, 1/4, Rest(3/2), 1/2, Rest(1)], [amp])
 	]);
 	Pseq([m1,m1,m3,m4]);
@@ -227,43 +260,113 @@ t4 = TempoClock(unit*4/3);
 	]), 4);
 };
 
-~kick_pitch = 46.midicps;
-drone1 = 53.midicps/~kick_pitch;
-drone2 = 52.midicps/~kick_pitch;
-drone3 = 48.midicps/~kick_pitch;
 
-~drone_pitches = Pseq([Pseq([drone1], 10), Pseq([drone2], 10), Pseq([drone3], 20)], 2);
-~drone_pitches2 = Prand([Pseq([0.4], 20), Pseq([0.45], 20), Pseq([0.6], 20)], 4);
-
-
-~drone1 = {
-	Pfx(
-		Pbind(\instrument, \kick, \noise_amp, 0, \out, 21, \amp, 0.15, \freq_ratio, ~drone_pitches, \dur, 1/5),
-		\choruscompresseffect
-	);
+~groove = {|amp=0.5|
+	var kick = ~rhythm.(\kick, [1/2,1/4,1/4, 1/2,1/4,1/4, 1/2,1/4,1/4, 1/2,1/4,1/4], amp*[1,0.5,0.5]);
+	var groove =
+	Pn(Ppar([
+			~rhythm.(\ride, [Rest(1.5), 1/4, 1/4, Rest(1/4), 1/4, 1/4, Rest(3/4)], [0.5]),
+			~rhythm.(\snare, [Rest(1), 1, Rest(1/4), 1/4, Rest(1/2), 1], [0.5]),
+			kick
+		]), 4);
+	var groove_and_bell =
+	Ppar([
+		groove,
+		Pn(~rhythm.(\kick, [1/3, 1/3, 1/3, 1/3, 1/3, 1/3, 3/4, 1/4, Rest(3/4), 1/4],
+			amp: amp*[1, 0.5, 0.5, 1, 0.5, 0.5, 1, 1, 1],
+			freqs: Pseq([2, 2, 2, 1.6, 1.6, 1.6, 1.4, 1.4, 0, 1.4]), noise_amp: 0), 4)
+	]);
+	Pseq([
+		kick,
+		kick,
+		Ppar([
+			~rhythm.(\snare, [Rest(1), 1, Rest(1), 1], [0.5]),
+			kick
+		]),
+		Ppar([
+			~rhythm.(\snare, [Rest(1), 1, Rest(1/4), 1/4, Rest(1/2), 1], [0.5]),
+			kick
+		]),
+		groove,
+		Pn(Pfx(Pfx(groove, \choruscompresseffect), \filtereffect), 2),
+		~rhythm.(\snare, [2, 2, 1, 1], [0.5]),
+		~rhythm.(\kick, [1/6,1/6,1/6,1/6,1/6,1/6], amp*[1,0.5,0.5,0.5,0.5,0.5], freqs: 2, noise_amp: 0),
+		~rhythm.(\kick, [1/6,1/6,1/6,1/6,1/6,1/6], amp*[1,0.5,0.5,0.5,0.5,0.5], freqs: 1, noise_amp: 0),
+		Pn(groove, 2),
+		Pn(groove_and_bell, 4)
+	])
 };
 
-~drone2 = {
-	Pfx(
-		Pbind(\instrument, \kick, \noise_amp, 0, \out, 21, \amp, 0.1, \freq_ratio, ~drone_pitches2, \dur, 1/5),
-		\choruscompresseffect
-	);
+~breakdown = {|final_reps=4, amp=0.5|
+	var final_kick = ~rhythm.(\kick, [1/4, Rest(1/2), 1/4, Rest(1), 1/4,1/4, Rest(1/4), 1/2, 1/2, 1/4], [1]);
+	var final_section =
+	Pn(
+		Ppar([
+			~rhythm.(\crash, [1, Rest(3)], [amp]),
+			~rhythm.(\ride, [1/2, 1/2, 1/2, 1/2, 1/2, 1/2, 1/2, 1/2], [amp]),
+			~rhythm.(\snare, [Rest(1/4),1/4,1/4, Rest(1/4), 1/2, 1/2, 1/4, Rest(1.75)], amp: [amp],
+				freqs: Pseq([1,1,1.1, 1, 1, 1.5, 1.6, 1], 1)),
+			final_kick
+		]),
+		4);
+	Pseq([
+		Ppar([
+			~rhythm.(\ride, [1/2, 1/2, 1/2, 1/2, 1/2, 1/2, 1/2, 1/2], [amp]),
+			~rhythm.(\snare, [Rest(1), 1/2, 1/2, Rest(2)], [amp]),
+			~rhythm.(\kick, [1/2, Rest(1/4), 1/4, Rest(2.5)], [amp]),
+		]),
+		Ppar([
+			~rhythm.(\ride, [1/2, 1/2, 1/2, 1/2, 1/2, 1/2, 1/2, 1/2], [amp]),
+			~rhythm.(\snare, [1/2, Rest(3.5)], [amp]),
+			~rhythm.(\kick, [Rest(1/4), 1/4, Rest(1/4), 1/4, 1/2, 1/2, Rest(2)], [amp]),
+		]),
+		Ppar([
+			~rhythm.(\ride, [1/2, 1/2, 1/2, 1/2, 1/2, 1/2, 1/2, 1/2], [amp]),
+			~rhythm.(\snare, [Rest(1/4),1/4,1/4, Rest(1/4), 1/2, 1/2, Rest(2)], [amp]),
+			~rhythm.(\kick, [1/4, Rest(1/2), 1/4, Rest(2.5)], [amp]),
+		]),
+		Ppar([
+			~rhythm.(\ride, [1/2, 1/2, 1/2, 1/2, 1/2, 1/2, 1/2, 1/2], [amp]),
+			~rhythm.(\snare, [1/4, Rest(1/2), 1/4, Rest(2.5)], [amp]),
+			~rhythm.(\kick, [Rest(1/4),1/4,1/4, Rest(1/4), 1/2, 1/2, Rest(2)], [amp]),
+		]),
+		Pseq([
+			~rhythm.(\snare, [1/6,1/6,1/6,1/6,1/6,1/6], amp*[1,0.5,0.5,0.5,0.5,0.5]),
+			~rhythm.(\kick, [1/6,1/6,1/6,1/6,1/6,1/6], amp*[1,0.5,0.5,0.5,0.5,0.5], freqs: 1, noise_amp: 0),
+			~rhythm.(\snare, [1/6,1/6,1/6,1/6,1/6,1/6], amp*[1,0.5,0.5,0.5,0.5,0.5]),
+			~rhythm.(\kick, [1/6,1/6,1/6,1/6,1/6,1/6], amp*[1,0.5,0.5,0.5,0.5,0.5], freqs: 1, noise_amp: 0),
+			~rhythm.(\snare, [1/6,1/6,1/6,1/6,1/6,1/6], amp*[1,0.5,0.5,0.5,0.5,0.5],),
+			~rhythm.(\kick, [1/6,1/6,1/6,1/6,1/6,1/6], amp*[1,0.5,0.5,0.5,0.5,0.5], freqs: 1.5, noise_amp: 0),
+			~rhythm.(\kick, [1/3, 1/3], [1,0.5], [amp, amp*0.5], freqs: 2, noise_amp: 0),
+			~rhythm.(\kick, [1/3, 1/3], [1,0.5], [amp, amp*0.5], freqs: 1.5, noise_amp: 0),
+			~rhythm.(\kick, [1/3, 1/3], [1,0.5], [amp, amp*0.5], freqs: 1, noise_amp: 0),
+		]),
+		final_section,
+		Pn(Ppar([final_section, ~drone2.()]), final_reps)], 1)
 };
 
-reps = 3;
+
+
+
+reps = 4;
 
 Pseq(
 	[
-		Pn(~main_break.(0.5), 1),
+		/*Pn(~main_break.(0.5), 1),
 		Pn(Ppar([~main_break.(0.5), ~drone2.()]), reps),
 		Pn(Ppar([~main_break.(0.5, ride_pat: 2), ~drone1.()]), reps),
 		Pn(Ppar([~latin_break.(0.5), ~drone1.()]), reps),
 		Pn(Ppar([~latin_break.(0.4), ~main_break.(0.4, ride_pat: 2), ~drone1.()]), reps),
-		Ppar([Pn(Ppar([~main_break.(0.5, ride_pat: 1)]), reps), Pn(~main_break.(0.5, ride_pat: 1, rel_dur: 3), reps/3)]),
-		Ppar([Pn(Ppar([~main_break.(0.5, ride_pat: 1), ~drone2.()]), reps), Pn(~main_break.(0.5, ride_pat: 1, rel_dur: 3), reps/3)]),
+		Ppar([Pn(Ppar([~main_break.(0.5, ride_pat: 1)]), 3), Pn(~main_break.(0.5, ride_pat: 1, rel_dur: 3), 1)]),
+		Ppar([Pn(Ppar([~main_break.(0.5, ride_pat: 1), ~drone2.()]), 3), Pn(~main_break.(0.5, ride_pat: 1, rel_dur: 3), 1)]),
+		~groove.(),
+		~breakdown.(),*/
+		Pn(~main_break.(0.5, final_snare: 0), 1),
 	]
 ).play(t);
 )
+
+FreqScope.new
 
 s.prepareForRecord;
 
